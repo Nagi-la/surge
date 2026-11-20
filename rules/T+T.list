@@ -6,6 +6,9 @@ IP-CIDR, 69.46.75.0/24, no-resolve
 IP-CIDR, 205.164.56.29/24, no-resolve
 IP-CIDR, 63.251.124.0/24, no-resolve
 #TikTok
+DOMAIN-SUFFIX,tiktokshop.com
+DOMAIN-SUFFIX,tiktokstaticb.com
+DOMAIN-SUFFIX,tiktokvapp.com
 DOMAIN,lf16-effectcdn.byteeffecttos-g.com
 DOMAIN,lf16-pkgcdn.pitaya-clientai.com
 DOMAIN,p16-tiktok-dm-sticker-sign-sg.ibyteimg.com
