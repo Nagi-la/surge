@@ -10,6 +10,7 @@ MAPPING = {
     'B+Y+W.list': {'Boc': 'BOC'},
     'G+S+Y+O.list': {'Spotify': 'Spotify', 'Gemini': 'Gemini', 'Google': 'Google', 'Github': 'GitHub', 'YouTube': 'YouTube', 'OpenAi': 'OpenAI'},
     'T+T.list': {'TikTok': 'TikTok'},
+    'Telegram.list': {'Telegram': 'Telegram'},
 }
 
 def fetch(url):
