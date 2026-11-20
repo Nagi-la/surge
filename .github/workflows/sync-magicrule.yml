@@ -9,22 +9,86 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: magicrule-sync
+  cancel-in-progress: false
+
 jobs:
   sync:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Add missing upstream rules
         id: sync
         run: python3 scripts/sync_magicrule.py
       - name: Create pull request
+        id: pr
         if: steps.sync.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
+          base: main
           branch: automation/magicrule-sync
           delete-branch: true
+          add-paths: |
+            rules/B+Y+W.list
+            rules/G+S+Y+O.list
+            rules/T+T.list
           title: 'chore: add missing MagicRule rules'
           commit-message: 'chore: add missing MagicRule rules'
           body: |
             Adds missing upstream rules without removing existing rules.
-            Review rule order and upstream changes before merging.
+            The workflow merges only validated additions to the synced lists.
+      - name: Verify and merge rule update
+        if: steps.pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pull-request-number }}
+          PR_HEAD: ${{ steps.pr.outputs.pull-request-head-sha }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          def output(*cmd):
+              return subprocess.check_output(cmd)
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          number, head = os.environ['PR_NUMBER'], os.environ['PR_HEAD']
+          if not re.fullmatch(r'[1-9][0-9]*', number) or not re.fullmatch(r'[0-9a-f]{40}', head):
+              raise SystemExit('Missing or invalid PR identity')
+          endpoint = f'repos/{repo}/pulls/{number}'
+          pr = json.loads(output('gh', 'api', endpoint))
+          base = pr['base']['sha']
+          if (pr['state'] != 'open' or pr['draft'] or pr['base']['ref'] != 'main'
+                  or pr['base']['repo']['full_name'].lower() != repo.lower()
+                  or pr['head']['ref'] != 'automation/magicrule-sync'
+                  or pr['head']['repo']['full_name'].lower() != repo.lower()
+                  or pr['head']['sha'] != head or not re.fullmatch(r'[0-9a-f]{40}', base)):
+              raise SystemExit('Unexpected PR, branch, or commit; not merging')
+
+          subprocess.run(['git', 'fetch', '--no-tags', '--depth=1', 'origin', base, head], check=True)
+          if output('git', 'diff', '--summary', '--no-renames', base, head).strip():
+              raise SystemExit('Unexpected file creation, deletion, or mode change; not merging')
+          paths = set(output('git', 'diff', '--no-renames', '--name-only', '-z', base, head).decode().split('\0')) - {''}
+          allowed = {'rules/B+Y+W.list', 'rules/G+S+Y+O.list', 'rules/T+T.list'}
+          if not paths or not paths <= allowed:
+              raise SystemExit(f'Unexpected changed files: {sorted(paths)}; not merging')
+          for path in sorted(paths):
+              before = output('git', 'show', f'{base}:{path}').decode().splitlines()
+              after = output('git', 'show', f'{head}:{path}').decode().splitlines()
+              remaining = iter(after)
+              if len(after) <= len(before) or not all(any(line == old for line in remaining) for old in before):
+                  raise SystemExit(f'{path}: not an additions-only change; not merging')
+              print(f'{path}: +{len(after) - len(before)}', flush=True)
+
+          result = json.loads(output('gh', 'api', endpoint + '/merge', '--method', 'PUT',
+                                     '-f', f'sha={head}', '-f', 'merge_method=merge'))
+          if not result['merged']:
+              raise SystemExit('GitHub did not merge the rule update')
+          print(f"Merged PR #{number} into main: {result['sha']}")
+          PY
