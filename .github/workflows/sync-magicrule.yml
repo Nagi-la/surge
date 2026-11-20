@@ -36,6 +36,7 @@ jobs:
             rules/B+Y+W.list
             rules/G+S+Y+O.list
             rules/T+T.list
+            rules/Telegram.list
           title: 'chore: add missing MagicRule rules'
           commit-message: 'chore: add missing MagicRule rules'
           body: |
@@ -75,7 +76,7 @@ jobs:
           if output('git', 'diff', '--summary', '--no-renames', base, head).strip():
               raise SystemExit('Unexpected file creation, deletion, or mode change; not merging')
           paths = set(output('git', 'diff', '--no-renames', '--name-only', '-z', base, head).decode().split('\0')) - {''}
-          allowed = {'rules/B+Y+W.list', 'rules/G+S+Y+O.list', 'rules/T+T.list'}
+          allowed = {'rules/B+Y+W.list', 'rules/G+S+Y+O.list', 'rules/T+T.list', 'rules/Telegram.list'}
           if not paths or not paths <= allowed:
               raise SystemExit(f'Unexpected changed files: {sorted(paths)}; not merging')
           for path in sorted(paths):
